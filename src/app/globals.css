@@ -1,0 +1,39 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Outfit:wght@500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #0f1c1a;
+  --muted: #5b6b66;
+  --panel: #f7faf8;
+  --wash: #e8f0ec;
+  --line: #cfdcd5;
+  --accent: #0d7a5f;
+  --accent-dark: #0a5f4a;
+  --bg1: #dfece6;
+  --bg2: #f4f7f5;
+}
+
+body {
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #c5ddd2 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #e7efe9 0%, transparent 50%),
+    linear-gradient(180deg, var(--bg2), var(--bg1));
+  font-family: "DM Sans", system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+.font-display {
+  font-family: "Outfit", "DM Sans", sans-serif;
+}
+
+.panel {
+  border-radius: 0.75rem;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 95%, transparent);
+  padding: 1.25rem;
+  box-shadow: 0 1px 2px rgb(15 28 26 / 6%);
+}
