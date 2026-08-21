@@ -1,0 +1,197 @@
+// Prisma schema — Last-Mile Delivery Tracker
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  passwordHash       String
+  name               String
+  phone              String?
+  role               String    @default("CUSTOMER") // CUSTOMER | AGENT | ADMIN
+  emailVerified      Boolean   @default(false)
+  emailVerifyToken   String?   @unique
+  emailVerifyExpires DateTime?
+  agentStatus        String? // AVAILABLE | BUSY | OFFLINE
+  currentLat         Float?
+  currentLng         Float?
+  homeZoneId         String?
+  homeZone           Zone?     @relation("AgentHomeZone", fields: [homeZoneId], references: [id])
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  ordersAsCustomer Order[]           @relation("CustomerOrders")
+  ordersCreated    Order[]           @relation("CreatedBy")
+  assignedOrders   Order[]           @relation("AgentOrders")
+  trackingEvents   TrackingEvent[]
+  attempts         DeliveryAttempt[]
+  notifications    NotificationLog[]
+}
+
+model Zone {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  areas        Area[]
+  agentsHome   User[]  @relation("AgentHomeZone")
+  pickupOrders Order[] @relation("PickupZone")
+  dropOrders   Order[] @relation("DropZone")
+}
+
+model Area {
+  id        String   @id @default(cuid())
+  zoneId    String
+  zone      Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  name      String
+  pinCode   String   @unique
+  city      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RateCard {
+  id          String   @id @default(cuid())
+  orderType   String
+  scope       String
+  minWeightKg Float
+  maxWeightKg Float?
+  ratePerKg   Float    @default(0)
+  flatRate    Float?
+  label       String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CodSurcharge {
+  id              String   @id @default(cuid())
+  orderType       String   @unique
+  surchargeAmount Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Order {
+  id                 String    @id @default(cuid())
+  orderNumber        String    @unique
+  customerId         String
+  customer           User      @relation("CustomerOrders", fields: [customerId], references: [id])
+  createdById        String
+  createdBy          User      @relation("CreatedBy", fields: [createdById], references: [id])
+  agentId            String?
+  agent              User?     @relation("AgentOrders", fields: [agentId], references: [id])
+
+  pickupAddress      String
+  pickupPin          String
+  pickupLat          Float?
+  pickupLng          Float?
+  pickupZoneId       String
+  pickupZone         Zone      @relation("PickupZone", fields: [pickupZoneId], references: [id])
+
+  dropAddress        String
+  dropPin            String
+  dropLat            Float?
+  dropLng            Float?
+  dropZoneId         String
+  dropZone           Zone      @relation("DropZone", fields: [dropZoneId], references: [id])
+
+  lengthCm           Float
+  breadthCm          Float
+  heightCm           Float
+  actualWeightKg     Float
+  volumetricWeightKg Float
+  billableWeightKg   Float
+
+  orderType          String
+  paymentType        String
+
+  baseCharge         Float
+  codSurcharge       Float     @default(0)
+  totalCharge        Float
+  chargeBreakdown    String
+
+  status             String    @default("CREATED")
+  scheduledDate      DateTime?
+  failureReason      String?
+  cancelReason       String?
+
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  trackingEvents  TrackingEvent[]
+  attempts        DeliveryAttempt[]
+  notifications   NotificationLog[]
+
+  @@index([status])
+  @@index([agentId])
+  @@index([pickupZoneId])
+  @@index([dropZoneId])
+  @@index([customerId])
+}
+
+model DeliveryAttempt {
+  id            String   @id @default(cuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  attemptNo     Int
+  scheduledDate DateTime
+  agentId       String?
+  agent         User?    @relation(fields: [agentId], references: [id])
+  outcome       String?
+  notes         String?
+  createdAt     DateTime @default(now())
+}
+
+model TrackingEvent {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus String?
+  toStatus   String
+  actorId    String
+  actor      User     @relation(fields: [actorId], references: [id])
+  actorRole  String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+model NotificationLog {
+  id        String   @id @default(cuid())
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  channel   String
+  recipient String
+  subject   String?
+  body      String
+  status    String
+  eventType String?
+  createdAt DateTime @default(now())
+}
+
+/// Transactional outbox — events written in the same DB transaction as domain changes
+model OutboxEvent {
+  id          String    @id @default(cuid())
+  type        String
+  payload     String
+  status      String    @default("PENDING") // PENDING | PROCESSED | FAILED
+  attempts    Int       @default(0)
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([status, createdAt])
+}
